@@ -1,0 +1,16 @@
+services:
+  assistant:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - assistant-data:/data
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  assistant-data:
