@@ -1,0 +1,6 @@
+.env
+.git
+work
+outputs
+*.sqlite3*
+__pycache__
