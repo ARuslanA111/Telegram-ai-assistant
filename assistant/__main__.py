@@ -61,8 +61,8 @@ def main():
     sub.add_parser("run", help="запустить Telegram polling и плановую синхронизацию")
     args = parser.parse_args()
     load_env()
-    if os.getenv("APP_MODE", "demo").lower() == "live" and args.command not in ("init","add-user","add-mailbox","bind-code","status","run","sync"):
-        parser.error("APP_MODE=live недоступен: Graph/Telegram/OneDrive адаптеры ещё не подключены")
+    if os.getenv("APP_MODE", "demo").lower() == "live" and args.command == "demo":
+        parser.error("Команда demo добавляет синтетические записи и доступна только в APP_MODE=demo")
     db = connect(); init(db)
     if args.command == "init":
         print("Локальная база готова.")

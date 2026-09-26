@@ -11,7 +11,28 @@ from zoneinfo import ZoneInfo
 
 from .core import STATUSES, change_status, employee_for_telegram, report, tasks_for
 from .db import audit, connect, init
-from .integrations import Extractor, Telegram
+from .integrations import Extractor, Graph, Telegram, extract_document_text
+
+
+def task_document_context(task, question):
+    """Read only matching documents under the explicitly configured shared folder."""
+    if os.getenv("APP_MODE", "demo").lower() != "live": return ""
+    drive_id=os.getenv("ONEDRIVE_DRIVE_ID","").strip()
+    folder_id=os.getenv("ONEDRIVE_ROOT_ITEM_ID","").strip()
+    if not drive_id or not folder_id: return ""
+    graph=Graph(); snippets=[]
+    try:
+        query=f"{task['title']} {question}"
+        for item in graph.search_documents_under_folder(drive_id,folder_id,query):
+            raw=graph.download_drive_file(drive_id,str(item["id"]),int(os.getenv("ONEDRIVE_MAX_FILE_MB","2"))*1024*1024)
+            text=extract_document_text(str(item.get("name","")),raw)
+            if not text.strip(): continue
+            snippets.append(f"Документ: {item.get('name','без названия')}\nИсточник: {item.get('webUrl','ссылка недоступна')}\n{text}")
+    except Exception as exc:
+        # Do not include Graph URLs, signed download links, or file contents in logs.
+        print(f"OneDrive context unavailable: {type(exc).__name__}",file=sys.stderr)
+        return "Материалы OneDrive не удалось получить. Отвечай только по описанию задачи и явно укажи это ограничение."
+    return "\n\n---\n\n".join(snippets)[:8000]
 
 
 def send_task(bot, chat, task):
@@ -153,7 +174,7 @@ def handle_message(bot, db, update, extractor):
     if m:
         task=db.execute("SELECT * FROM tasks WHERE id=? AND assignee_email=?",(int(m[1]),user["email"])).fetchone()
         if not task: bot.send(chat_id,"Задача недоступна."); return
-        try: answer=extractor.answer(m[2],task)
+        try: answer=extractor.answer(m[2],task,task_document_context(task,m[2]))
         except Exception: answer="Помощник временно не смог ответить. Повторите запрос позже."
         bot.send(chat_id,answer); return
     bot.send(chat_id,"Не понял команду. /help")
